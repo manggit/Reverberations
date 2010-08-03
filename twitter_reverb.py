@@ -5,6 +5,7 @@
 
 import tweepy
 import getpass
+import os.path
 
 
 class Node:
@@ -22,6 +23,8 @@ class parentNode:
         self.parent_twid = parent_twid
         self.twid = twid
 
+
+#depreciated function, will not work after Aug 16
 def authenticate(usr='0', pswd='0'):
     if usr == '0':
         usr = raw_input("twitter username: ")
@@ -29,6 +32,38 @@ def authenticate(usr='0', pswd='0'):
     auth = tweepy.BasicAuthHandler(usr, pswd)
     api = tweepy.API(auth)
     return api
+
+
+#authenticate using OAuth
+def Oauthenticate():
+    auth = tweepy.OAuthHandler('XSlYVMJ9ebCXOfdOPolgDg', 'RQdQxOnPFRqKogfVqL0JdpGwadXZ6XawtXn7QpcQ')
+    
+    try:
+        redirect_url = auth.get_authorization_url()
+        print 'Please visit the following URL and allow access to Reverb.it:'
+        print redirect_url
+    except tweepy.TweepError:
+        print 'Error! Failed to get request token.'
+
+    verifier = raw_input('Please enter the pin code: ')
+    
+    try:
+        auth.get_access_token(verifier)
+    except tweepy.TweepError:
+        print 'Error! Failed to get access token.'
+
+
+    #save tokens to file
+    filename = 'token.txt'
+    FILE = open(filename, "w")
+    FILE.write(auth.access_token.key)
+    FILE.write(auth.access_token.secret)
+    FILE.close()
+    
+    api = tweepy.API(auth)
+    return api
+
+
 
 def calulate_Rank(tweetID, auth):
     idx_lvl = 0
@@ -39,6 +74,7 @@ def calulate_Rank(tweetID, auth):
     x = 1
     
     twt = auth.get_status(tweetID)             #get current tweet
+    print twt.text
     pnode = parentNode(twt.user, 'top', tweetID)
     lvl.append(pnode)                          #append rt id's to nxtlvl list
 
@@ -69,13 +105,9 @@ def calulate_Rank(tweetID, auth):
 
                 idx_usr = idx_usr+1             #increment user list index
             except tweepy.error.TweepError:
-                print 'caught error'
+                print 'caught error', idx_usr, len(lvl)
                 idx_usr = idx_usr+1             #increment user list index
                 continue
-
-#make sure to remove in the future before handing in
-        if (not(x % 3)):
-            auth = authenticate('SwiftTest', 'Pr3t3nt!0usWr1ting!')
             
         del lvl[:]
         lvl = list(nxtlvl)                        #assign nxtlvl to lvl
@@ -91,8 +123,24 @@ def calulate_Rank(tweetID, auth):
     
     
 def main():
-    api = authenticate()
-    tree = calulate_Rank(20065671636, api)
+    if(os.path.isfile('token.txt')):
+       print 'file exists'
+       f = open('token.txt', 'r')
+       key = f.readline()
+       secret = f.readline()
+       auth = tweepy.OAuthHandler('XSlYVMJ9ebCXOfdOPolgDg', 'RQdQxOnPFRqKogfVqL0JdpGwadXZ6XawtXn7QpcQ')
+       auth.set_access_token(key, secret)
+       api = tweepy.API(auth)
+       
+    else:
+        api = Oauthenticate()
+
+    try:
+        tree = calulate_Rank(20065671636, api)
+    except tweepy.TweepError:
+        print 'token invalid'
+        api = Oauthenticate()
+        tree = calulate_Rank(20065671636, api)
 
     for s in tree:
         print s.twid, s.lvl, s.rank, s.sn.screen_name
