@@ -6,6 +6,10 @@
 import tweepy
 import getpass
 import os.path
+import json
+import pickle
+
+global topTree     #top tree
 
 
 class Node:
@@ -55,7 +59,7 @@ def Oauthenticate():
 
     #save tokens to file
     filename = 'token.txt'
-    FILE = open(filename, "w")
+    FILE = open(filename, 'w')
     FILE.write(auth.access_token.key)
     FILE.write(auth.access_token.secret)
     FILE.close()
@@ -63,9 +67,17 @@ def Oauthenticate():
     api = tweepy.API(auth)
     return api
 
+def SaveAndPickle(tree):
+    filename = 'jsonRanks.txt'
+    FILE = open(filename, 'w')
+    
+    pickle.dump(tree, FILE)
+    #FILE.write('{Rankings: [')
+    #for s in tree:
+     #   FILE.write(s.sn.screen_name, " : { Level :", s.lvl)
 
-
-def calulate_Rank(tweetID, auth):
+def getTweets(tweetID, auth):
+    global topTree                              #declaration needed for function to modify topTree
     idx_lvl = 0
     idx_usr = 0
     lvl = []
@@ -101,7 +113,7 @@ def calulate_Rank(tweetID, auth):
                             lvl[idx_usr].twid,
                             lvl[idx_usr].parent_twid)
                 print twt.user.screen_name
-                tree.append(node)               #append new node to tree list
+                topTree.append(node)                           #append new node to tree list
 
                 idx_usr = idx_usr+1             #increment user list index
             except tweepy.error.TweepError:
@@ -118,11 +130,17 @@ def calulate_Rank(tweetID, auth):
         idx_usr = 0                         #rest list index to 0
         print 'testing', len(lvl)
                 
-        
-    return tree
-    
+
+
+
+
+
+
+
     
 def main():
+    global topTree                          #needed to be able to modify topTree
+    
     if(os.path.isfile('token.txt')):
        print 'file exists'
        f = open('token.txt', 'r')
@@ -136,16 +154,18 @@ def main():
         api = Oauthenticate()
 
     try:
-        tree = calulate_Rank(20065671636, api)
+        getTweets(20523796963, api)
     except tweepy.TweepError:
         print 'token invalid'
+        topTree = []                      #clear topTree in case something was written in the try statement
         api = Oauthenticate()
-        tree = calulate_Rank(20065671636, api)
+        getTweets(20523796963, api)
 
-    for s in tree:
-        print s.twid, s.lvl, s.rank, s.sn.screen_name
+    
+    SaveAndPickle(topTree)
+    for s in topTree:
+        print s.twid, s.lvl, s.rank, s.sn.screen_name, s.ts, s.sn.id
 
         
-
 if __name__ == "__main__":
     main()
