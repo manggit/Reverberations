@@ -9,6 +9,7 @@ import os.path
 import json
 import pickle
 import sys
+import decimal
 
 
 class Node:
@@ -73,64 +74,6 @@ def SaveAndPickle(tree):
     pickle.dump(tree, FILE)
 
 
-def getTweets(tweetID, auth):
-    idx_lvl = 0
-    idx_usr = 0
-    lvl = []
-    nxtlvl = []
-    tree = []
-    x = 1
-    
-    twt = auth.get_status(tweetID)             #get current tweet
-    print twt.text
-    pnode = parentNode(twt.user, 'top', tweetID)
-    lvl.append(pnode)                          #append rt id's to nxtlvl list
-
-
-    #outer loop that keeps track of tree level
-    while (x > 0):
-        print 'length of lvl', len(lvl)
-        
-        #inner loop steps through users in given level
-        while idx_usr < len(lvl):
-            print 'in second loop'
-            try:
-                rt = auth.retweets(lvl[idx_usr].twid, 100)      #get retweets
-                print 'hello'
-                twt = auth.get_status(lvl[idx_usr].twid)        #get current tweet
-                print'got tweet'
-                
-                for s in rt:                                     #step through retweets
-                    pnode = parentNode(twt.user, twt.id, s.id)   #s.id is the tweet id of the retweet
-                    nxtlvl.append(pnode)                         #append rt id's to nxtlvl list
-                    print twt.user.screen_name, s.id
-                print 'length of next level is', len(nxtlvl)
-
-                node = Node(twt.user, 0,           #create new node for tree
-                            idx_lvl, twt.created_at,
-                            lvl[idx_usr].twid,
-                            lvl[idx_usr].parent_twid)
-                print twt.user.screen_name
-                tree.append(node)                           #append new node to tree list
-
-                idx_usr = idx_usr+1             #increment user list index
-                
-            except tweepy.error.TweepError:
-                print 'caught error', idx_usr, len(lvl)
-                idx_usr = idx_usr+1             #increment user list index
-                continue
-            
-        del lvl[:]
-        lvl = list(nxtlvl)                        #assign nxtlvl to lvl
-        x = len(lvl)
-        print 'x is ', x
-        del nxtlvl[:]                       #clear nxtlvl
-        idx_lvl = idx_lvl+1                 #increment level counter
-        idx_usr = 0                         #rest list index to 0
-        print 'testing', len(lvl)
-    return tree
-
-
 #creates a retweet chian tree, if a retweet is not of a another retweet, it is assumed to be the direct retweet of the orignal tweet
 def get_followers(tweetID, auth):
     rt = auth.retweets(tweetID)
@@ -155,16 +98,10 @@ def get_followers(tweetID, auth):
         tree.append(node)
         lvl_users.append(node)  #place first element in rt into lvl_users since rt is ts sorted,
                                 #it cannot be a retwet of any rts that come after it in the array
-
-        for r in rt:
-            print 'before', r.user.screen_name
         
         rt.pop(0)            #remove the top in rt
         
         loop = True
-
-        for r in rt:
-            print r.user.screen_name
 
         while (loop):
             while (len(lvl_users) > 0):
@@ -183,7 +120,6 @@ def get_followers(tweetID, auth):
                         if(r.user.id == f):
                             #create a node in tree and node in next_lvl
                             node = Node(r.user, float(0), lvl_idx, r.created_at, r.id, lvl_users[0].twid)
-                            print 'new node', node.user.screen_name, node.ts
 
                             #insert node into tree and nxt_lvl
                             tree.append(node)
@@ -198,7 +134,6 @@ def get_followers(tweetID, auth):
 
             if(len(nxt_lvl) == 0):
                 loop = False
-                print 'no next level', lvl_idx
 
             del lvl_users[:]    #delete lvl_users list
             lvl_users = list(nxt_lvl) #copy nxt_lvl list int lvl_users
@@ -231,7 +166,6 @@ def calcRank(tree):
             lvl_diff = current_node.lvl - tree[idx].lvl      #find the number of levels in between
             tree[idx].rank = tree[idx].rank + (1.0/lvl_diff) #increase rank
 
-            #current_node = tree[idx]             #change current_node to parent node
             temp = tree[idx]
     return tree
 
@@ -249,7 +183,6 @@ def main():
         return
         
     if(os.path.isfile('token.txt')):
-       print 'file exists'
        f = open('token.txt', 'r')
        key = f.readline()
        secret = f.readline()
@@ -262,25 +195,17 @@ def main():
 
 
     try:
-        #tree = getTweets(20579518001, api)
         tree = get_followers(sys.argv[1], api)
         
     except tweepy.TweepError:
         print 'token invalid'
         api = Oauthenticate()
         tree = get_followers(sys.argv[1], api)
-        #tree = getTweets(20580118288, api)
-
-        
-        for s in tree:
-            print s.twid, s.lvl, s.user.screen_name, s.ts, s.user.id, s.rtusr, s.rank
         calcRank(tree)
 
     
     SaveAndPickle(tree)
 
-    for s in tree:
-        print s.twid, s.lvl, s.user.screen_name, s.ts, s.user.id, s.rtusr, s.rank
 
         
 if __name__ == "__main__":
