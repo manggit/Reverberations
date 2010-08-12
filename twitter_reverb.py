@@ -11,7 +11,6 @@ import pickle
 import sys
 
 
-
 class Node:
     def __init__(self, user, rank, lvl, ts, twid, parent_twid):
         self.user = user
@@ -152,7 +151,7 @@ def get_followers(tweetID, auth):
         if(lvl_idx != 0):
             lvl_idx = 1
             
-        node = Node(rt[0].user, 0, lvl_idx, rt[0].created_at, rt[0].id, twt.id)
+        node = Node(rt[0].user, float(0), lvl_idx, rt[0].created_at, rt[0].id, twt.id)
         tree.append(node)
         lvl_users.append(node)  #place first element in rt into lvl_users since rt is ts sorted,
                                 #it cannot be a retwet of any rts that come after it in the array
@@ -170,20 +169,20 @@ def get_followers(tweetID, auth):
         while (loop):
             while (len(lvl_users) > 0):
                 #get followers
-                followers = auth.followers_ids(lvl_users[0].user.screen_name)
+                try:
+                    followers = auth.followers_ids(lvl_users[0].user.screen_name)
+                except tweepy.error.TweepError:
+                    print 'request to twitter failed'
+                    return
+                    
                 lvl_idx = lvl_idx + 1 #increase level value
 
-                #print followers
-               # for f in followers:
-               #     print "followers"
-                  #  print (auth.get_user(f)).screen_name
-                
                 #match followers with users in rt
                 for r in rt:
                     for f in followers:
                         if(r.user.id == f):
                             #create a node in tree and node in next_lvl
-                            node = Node(r.user, 0, lvl_idx, r.created_at, r.id, lvl_users[0].twid)
+                            node = Node(r.user, float(0), lvl_idx, r.created_at, r.id, lvl_users[0].twid)
                             print 'new node', node.user.screen_name, node.ts
 
                             #insert node into tree and nxt_lvl
@@ -219,28 +218,22 @@ def calcRank(tree):
     for nodes in treeReverse:          #moving down tree list in reverse order (tree is reverse of topTree)
 
         current_node = nodes
+        temp = current_node
 
-        while(current_node.twid != topnode.twid):
+        while(temp.twid != topnode.twid):
         
             #find index of parent node in topTree
             for prnt in tree:
-                if(current_node.rtusr == prnt.twid):
+                if(temp.rtusr == prnt.twid):
                     idx = tree.index(prnt)          #get index of parent node in top tree
                     break                           #parent idx found no need to continue
 
-            lvl_diff = current_node - prnt.lvl      #find the number of levels in between
-            tree[idx].rank = tree[idx].rank + (1/lvl_diff) #increase rank
+            lvl_diff = current_node.lvl - tree[idx].lvl      #find the number of levels in between
+            tree[idx].rank = tree[idx].rank + (1.0/lvl_diff) #increase rank
 
-            current_node = topTree[idx]             #change current_node to parent node
+            #current_node = tree[idx]             #change current_node to parent node
+            temp = tree[idx]
     return tree
-
-
-
-                    
-                                   
-        
-
-
 
 
     
@@ -269,24 +262,25 @@ def main():
 
 
     try:
-        #tree = getTweets(sys.argv[1], api)
         #tree = getTweets(20579518001, api)
-        tree2 = get_followers(sys.argv[1], api)
+        tree = get_followers(sys.argv[1], api)
         
     except tweepy.TweepError:
         print 'token invalid'
         api = Oauthenticate()
-       # tree = getTweets(sys.argv[1], api)
-        tree2 = get_followers(sys.argv[1], api)
+        tree = get_followers(sys.argv[1], api)
         #tree = getTweets(20580118288, api)
 
-    
-#    SaveAndPickle(tree)
-    #for s in tree:
-#        print s.twid, s.lvl, s.sn.screen_name, s.ts, s.sn.id
+        
+        for s in tree:
+            print s.twid, s.lvl, s.user.screen_name, s.ts, s.user.id, s.rtusr, s.rank
+        calcRank(tree)
 
-    for s in tree2:
-        print s.twid, s.lvl, s.user.screen_name, s.ts, s.user.id, s.rtusr
+    
+    SaveAndPickle(tree)
+
+    for s in tree:
+        print s.twid, s.lvl, s.user.screen_name, s.ts, s.user.id, s.rtusr, s.rank
 
         
 if __name__ == "__main__":
